@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useServer } from '../contexts/ServerContext';
-import {runInference, validateInputArray, generateSampleArray, validateAndProcessImage, evaluateTestSet} from '../services/api';
+import {runInference, validateInputArray, generateSampleArray, validateAndProcessImage, evaluateTestSet, inspectShakespearePrompt, SHAKESPEARE_SAMPLE} from '../services/api';
 import InputDataSelector from '../components/InputDataSelector';
 
 const InferPage = () => {
@@ -15,6 +15,13 @@ const InferPage = () => {
   const [testEvalLoading, setTestEvalLoading] = useState(false);
   const [testEvalResponse, setTestEvalResponse] = useState(null);
   const [testEvalError, setTestEvalError] = useState(null);
+  const [textNodeUrl, setTextNodeUrl] = useState('localhost:8081');
+
+  const textCheck = inputType === 'text' ? inspectShakespearePrompt(inputData) : null;
+
+  const resolveUrl = (value) => (
+    value.startsWith('http://') || value.startsWith('https://') ? value : `http://${value}`
+  );
 
   const generateSampleData = () => {
     const array = generateSampleArray();
@@ -58,10 +65,17 @@ const InferPage = () => {
       } else if (inputType === 'draw') {
         // For grid drawings, the data is already in the correct format
         inputArray = typeof inputData === 'string' ? JSON.parse(inputData) : inputData;
+      } else if (inputType === 'text') {
+        const encoded = inspectShakespearePrompt(inputData);
+        if (encoded.ids.length === 0) {
+          throw new Error('Enter a prompt that includes characters from the Shakespeare vocabulary.');
+        }
+        inputArray = encoded.ids;
       }
 
       console.log("FINAL ARRAY:", inputArray)
-      const data = await runInference(serverUrl, { input: inputArray, index: indexValue });
+      const inferenceUrl = inputType === 'text' ? resolveUrl(textNodeUrl) : serverUrl;
+      const data = await runInference(inferenceUrl, { input: inputArray, index: indexValue });
       setResponse(data);
     } catch (err) {
       setError(err.message);
@@ -76,7 +90,8 @@ const InferPage = () => {
     setTestEvalResponse(null);
 
     try {
-      const data = await evaluateTestSet(serverUrl, indexValue);
+      const evaluationUrl = inputType === 'text' ? resolveUrl(textNodeUrl) : serverUrl;
+      const data = await evaluateTestSet(evaluationUrl, indexValue);
       setTestEvalResponse(data);
     } catch (err) {
       setTestEvalError(err.message);
@@ -117,10 +132,45 @@ const InferPage = () => {
           onDataChange={handleDataChange}
         />
 
+        {inputType === 'text' && (
+          <div className="form-group">
+            <label htmlFor="textNodeUrl">Training node:</label>
+            <input
+              type="text"
+              id="textNodeUrl"
+              value={textNodeUrl}
+              onChange={(e) => setTextNodeUrl(e.target.value)}
+              placeholder="localhost:8081"
+              required
+            />
+            <small>
+              Live text prediction is sent to this training node, not the aggregator in the header.
+              The node must already be initialized with the index above.
+            </small>
+          </div>
+        )}
+
+        {textCheck && textCheck.dropped.length > 0 && (
+          <div className="info-box">
+            <p>
+              Ignored characters outside the vocabulary: {textCheck.dropped.join(' ')}
+            </p>
+          </div>
+        )}
+
         <div className="button-group">
           {inputType === 'json' && (
             <button type="button" onClick={generateSampleData} className="btn-secondary">
               Generate Sample Data
+            </button>
+          )}
+          {inputType === 'text' && (
+            <button
+              type="button"
+              onClick={() => handleDataChange(SHAKESPEARE_SAMPLE, 'text')}
+              className="btn-secondary"
+            >
+              Use Sample Line
             </button>
           )}
           <button type="submit" disabled={loading} className="btn-primary">
@@ -154,7 +204,25 @@ const InferPage = () => {
       {response && (
         <div className="success-message">
           <h3>Inference Results:</h3>
-          <pre>{JSON.stringify(response, null, 2)}</pre>
+          {response.prediction && typeof response.prediction === 'object' && response.prediction.continuation ? (
+            <div className="text-prediction">
+              <p className="text-prediction-line">
+                <span>{response.prediction.prompt}</span>
+                <span className="continuation">{response.prediction.continuation}</span>
+              </p>
+              {Array.isArray(response.prediction.top_k) && (
+                <ul className="top-k-list">
+                  {response.prediction.top_k.map((item) => (
+                    <li key={`${item.char}-${item.probability}`}>
+                      {item.char === '\n' ? '\\n' : item.char} ({item.probability})
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : (
+            <pre>{JSON.stringify(response, null, 2)}</pre>
+          )}
         </div>
       )}
 

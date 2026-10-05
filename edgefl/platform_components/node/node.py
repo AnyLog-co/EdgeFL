@@ -86,15 +86,15 @@ class Node:
             
 
     def initialize_training_app_on_index(self, index):
+        training_app_path = os.path.join(self.training_application_dir, self.module_paths[index])
+        class_name = self.module_names[index]
         try:
-            training_app_path = os.path.join(self.training_application_dir, self.module_paths[index])
-            TrainingApp_class = load_class_from_file(training_app_path, self.module_names[index]) # TODO: this takes too long
-            self.data_handlers[index] = TrainingApp_class(self.replica_name) # Create an instance at index
-        except Exception as e: # TODO: raise an actual Error
-            return {
-                'status': 'error',
-                'message': str(e)
-            }
+            TrainingApp_class = load_class_from_file(training_app_path, class_name)
+        except Exception as error:
+            message = f"Could not load training class '{class_name}' from '{training_app_path}': {error}"
+            self.logger.error(f"[{index}] {message}")
+            raise RuntimeError(message) from error
+        self.data_handlers[index] = TrainingApp_class(self.replica_name) # Create an instance at index
 
     # On startup, indexes, modules, and module_paths caches are empty, so refill
     def fetch_indexes_and_modules(self):

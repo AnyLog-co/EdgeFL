@@ -575,6 +575,44 @@ code {
   text-align: center;
 }
 
+.text-prediction {
+  margin-top: 12px;
+}
+
+.text-prediction-line {
+  white-space: pre-wrap;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.15rem;
+  line-height: 1.6;
+  background: white;
+  color: #333;
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+}
+
+.text-prediction .continuation {
+  color: #007bff;
+  font-weight: 600;
+}
+
+.top-k-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.top-k-list li {
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .page-container {

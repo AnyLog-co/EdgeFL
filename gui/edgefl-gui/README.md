@@ -14,6 +14,7 @@ A modern React-based graphical user interface for the EDGEFL (Edge Federated Lea
 - **JPG Images**: Image file upload (coming soon)
 - **WAV Audio**: Audio file upload (coming soon)
 - **Draw Canvas**: Interactive 28x28 grid for drawing
+- **Text**: Shakespeare prompt continued by a training node
 
 ### 🎨 **Modern UI/UX**
 - Clean blue and white design theme
@@ -83,10 +84,11 @@ docker run -p 3000:3000 edgefl-gui:latest
 3. **Start Training**: Begin the federated learning process
 
 ### Step 3: Inference
-1. **Choose Input Type**: Select from JSON, JPG, WAV, or Draw Canvas
+1. **Choose Input Type**: Select from JSON, JPG, WAV, Draw Canvas, or Text
 2. **Provide Data**: 
    - **JSON**: Enter or upload a 28x28 array
    - **Draw Canvas**: Click and drag on the 28x28 grid
+   - **Text**: Type a line and set the training-node URL. The node returns a continuation.
 3. **Run Inference**: Process your data through the trained model
 
 ## API Endpoints

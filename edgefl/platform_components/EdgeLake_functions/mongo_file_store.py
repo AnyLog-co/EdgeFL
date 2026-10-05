@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/
 
 
 import os
+import subprocess
 import time
 import docker
 # Add files to MongoDB through EdgeLake
@@ -35,35 +36,56 @@ def write_file(edgelake_node_url, dbms, table, filename):
 
 def create_directory_in_container(edgelake_url, container_name, directory_path):
     """
-    Create a directory inside a Docker container.
+    Create a directory inside the EdgeLake container.
 
-    Args:
-        container_name (str): Name or ID of the container.
-        directory_path (str): Path of the directory to create inside the container.
+    AnyLog's `system mkdir` replies with an error body that is not valid
+    chunked HTTP, so requests raises ChunkedEncodingError (AnyLog err_code 61).
+    Create the directory with docker exec against the named container instead.
     """
-    # client = docker.from_env()
-    # container = client.containers.get(container_name)
-    #
-    # # Run the `mkdir` command inside the container
-    # command = f"mkdir -p {directory_path}"
-    # exit_code, output = container.exec_run(command)
-    #
-    # if exit_code == 0:
-    #     print(f"Directory '{directory_path}' created successfully in container '{container_name}'.")
-    # else:
-    #     print(f"Failed to create directory. Error: {output.decode('utf-8')}")
+    directory_path = directory_path.replace("\\", "/")
+    if container_name and _mkdir_with_docker(container_name, directory_path):
+        return
 
+    _mkdir_with_anylog(edgelake_url, directory_path)
+
+
+def _mkdir_with_docker(container_name, directory_path):
+    try:
+        completed = subprocess.run(
+            ["docker", "exec", container_name, "mkdir", "-p", directory_path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        print(f"Could not run docker exec on {container_name}: {error}")
+        return False
+
+    if completed.returncode == 0:
+        return True
+
+    detail = (completed.stderr or completed.stdout or "").strip()
+    print(
+        f"docker exec {container_name} mkdir -p {directory_path} failed: {detail}. "
+        "EDGELAKE_DOCKER_CONTAINER_NAME must match `docker ps`."
+    )
+    return False
+
+
+def _mkdir_with_anylog(edgelake_url, directory_path):
     headers = {
-        "command": f"system mkdir -p {directory_path}", # -p creates the entire nested directory path
+        "command": f"system mkdir -p {directory_path}",
         "User-Agent": "AnyLog/1.23",
         "Content-Type": "text/plain",
     }
-
     try:
-        resp = requests.post(edgelake_url, data='', headers=headers)
-    except:
-        errno, value = sys.exc_info()[:2]
-        print(f'Error: {errno}: {value}')
+        response = requests.post(edgelake_url, data="", headers=headers, timeout=30)
+    except requests.exceptions.RequestException as error:
+        print(f"AnyLog could not create {directory_path}: {error}")
+        return
+
+    if response.status_code != 200 or "err_code" in response.text:
+        print(f"AnyLog could not create {directory_path}: {response.status_code} {response.text}")
 
 
 def copy_file_to_container(tmp_dir, container_name, edgelake_url, src_path, dest_path):
@@ -200,22 +222,35 @@ def copy_file_from_container(tmp_dir, container_name, edgelake_data_host_url, sr
 
 
 def read_file(edgelake_node_url, file_path, dest, ip_port):
-    filename = file_path.split('/')[-1]
-    headers = {
-        'User-Agent': 'AnyLog/1.23',
-        'Content-Type': 'text/plain',
-        # 'command': f'file get (dbms={dbms} and table={table} and id={filename.split("/")[-1]}) {dest}',
-        'command': f'file get {file_path} {dest}'
-        # 'destination': ip_port
-    }
+    """Pull a file from an EdgeLake node over REST and save it at `dest`.
 
-    # print(f"FILE GET COMMAND: headers: {headers['command']}")
+    `file get` only works behind `run client` and returns err_code 2 when posted
+    directly. `file from` returns the file bytes to the REST caller.
+    """
+    command = f"file from {file_path}"
+    headers = {
+        "User-Agent": "AnyLog/1.23",
+        "Content-Type": "text/plain",
+        "command": command,
+    }
     try:
-        response = requests.post(edgelake_node_url, headers=headers, data='')
-        return response
-    except:
-        errno, value = sys.exc_info()[:2]
-        print(f'Error: {errno}: {value}')
+        response = requests.post(edgelake_node_url, headers=headers, data=b"", timeout=60)
+    except requests.exceptions.RequestException as error:
+        raise RuntimeError(
+            f"AnyLog could not return {file_path} from {edgelake_node_url}: {error}"
+        ) from None
+    if response.status_code != 200 or not response.content:
+        detail = response.text[:300] if response.text else "empty body"
+        raise RuntimeError(
+            f"AnyLog could not return {file_path} from {edgelake_node_url}: "
+            f"HTTP {response.status_code} {detail}"
+        )
+    parent = os.path.dirname(dest)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(dest, "wb") as handle:
+        handle.write(response.content)
+    return response
 
 
 

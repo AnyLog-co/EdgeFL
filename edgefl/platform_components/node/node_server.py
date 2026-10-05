@@ -132,6 +132,12 @@ def init_node(request: InitNodeRequest):
         raise ConnectionError(
             f"Unable to access the database tables: {str(e)}"
         )
+    except Exception as e:
+        logger.error(f"Failed to initialize node: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 def listen_for_start_round(nodeInstance, index, stop_event):
@@ -213,11 +219,14 @@ def inference(index):
             )
         results = node_instance.inference(index)
         response = {
-                    'index': f'{index}',
-                    'status': 'success',
-                    'message': 'Inference completed successfully',
-                    'model_accuracy': f'{str(results)}'
-                    }
+            'index': f'{index}',
+            'status': 'success',
+            'message': 'Inference completed successfully',
+        }
+        if isinstance(results, dict):
+            response.update(results)
+        else:
+            response['model_accuracy'] = str(results)
         return JSONResponse(content=response)
     except Exception as e:
         raise HTTPException(
@@ -238,14 +247,13 @@ def direct_inference(request: InferenceRequest):
         float_list = request.input
         index = request.index
         results = node_instance.direct_inference(index, float_list)
-        response = {
-            'prediction': str(results),
-        }
-        return response
+        if isinstance(results, dict):
+            return {'prediction': results}
+        return {'prediction': str(results)}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Error executing inference on model. Check inference function in data handler"
+            detail=f"Error executing inference on model: {e}"
         )
 
 if __name__ == '__main__':

@@ -93,7 +93,8 @@ const InputDataSelector = ({ inputData, setInputData, onDataChange }) => {
           { value: 'jpg', label: 'JPG Image', icon: '🖼️' },
           { value: 'png', label: 'PNG Image', icon: '🖼️' },
           { value: 'wav', label: 'WAV Audio', icon: '🎵' },
-          { value: 'draw', label: 'Draw Canvas', icon: '✏️' }
+          { value: 'draw', label: 'Draw Canvas', icon: '✏️' },
+          { value: 'text', label: 'Text', icon: '📝' }
         ].map(({ value, label, icon }) => (
           <button
             key={value}
@@ -182,6 +183,27 @@ const InputDataSelector = ({ inputData, setInputData, onDataChange }) => {
     </div>
   );
 
+  const renderTextInput = () => (
+    <div className="form-group">
+      <label htmlFor="textPrompt">Prompt:</label>
+      <textarea
+        id="textPrompt"
+        value={typeof inputData === 'string' ? inputData : ''}
+        onChange={(e) => {
+          setInputData(e.target.value);
+          if (onDataChange) onDataChange(e.target.value, 'text');
+        }}
+        placeholder="To be, or not to be, that is the question"
+        rows={5}
+        required
+      />
+      <small>
+        The training node continues this line one character at a time.
+        Characters outside the Shakespeare vocabulary are left out of the request.
+      </small>
+    </div>
+  );
+
   const renderDrawCanvas = () => (
     <div className="form-group">
       <label>Draw Canvas (28x28 Grid):</label>
@@ -222,6 +244,7 @@ const InputDataSelector = ({ inputData, setInputData, onDataChange }) => {
       {renderInputTypeSelector()}
       
       {inputType === 'json' && renderJsonInput()}
+      {inputType === 'text' && renderTextInput()}
       {(inputType === 'png' || inputType === 'jpg' || inputType === 'wav') && renderFileUpload()}
       {inputType === 'draw' && renderDrawCanvas()}
     </div>
