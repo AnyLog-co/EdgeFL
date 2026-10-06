@@ -613,6 +613,74 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
+.upload-error {
+  display: block;
+  margin-top: 8px;
+  color: #b00020;
+}
+
+.prepared-pixels {
+  display: block;
+  margin-top: 8px;
+  color: #155724;
+}
+
+.class-prediction-name {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.class-prediction-name span,
+.class-prediction-file {
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: #333;
+}
+
+.class-probability-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.class-probability-list li {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.4fr) 2fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.class-probability-track {
+  display: block;
+  height: 10px;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.class-probability-track span {
+  display: block;
+  height: 100%;
+  background: #8eb8e5;
+}
+
+.class-probability-list li.predicted .class-probability-track span {
+  background: #007bff;
+}
+
+.class-probability-list li.predicted .class-probability-label {
+  font-weight: 600;
+}
+
+.class-probability-value {
+  font-variant-numeric: tabular-nums;
+  min-width: 52px;
+  text-align: right;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .page-container {

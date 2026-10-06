@@ -186,6 +186,12 @@ export const generateSampleArray = () => {
 };
 
 /**
+ * BloodMNIST model resolution. Must match IMAGE_SIZE in medmnist_common.py.
+ * The training node averages an uploaded photo down to this size.
+ */
+export const MEDMNIST_IMAGE_SIZE = 28;
+
+/**
  * Tiny Shakespeare vocabulary. Must match CHARSET in shakespeare_common.py.
  */
 export const SHAKESPEARE_CHARSET =
