@@ -1,21 +1,25 @@
-pydantic~=2.11.0a2
-python-dotenv~=1.0.1
-requests~=2.32.3
-FastAPI~=0.115.8
-uvicorn~=0.34.0
-docker~=7.1.0
+pydantic~=2.13.5
+python-dotenv~=1.2.4
+requests~=2.34.2
+FastAPI~=0.142.2
+uvicorn~=0.54.0
+docker~=7.2.0
+requests_toolbelt~=1.0.0
+setuptools
+numpy
 
 ##### based on the data handler needs ####
-#numpy~=1.26.0
-#scikit-learn~=1.6.1
-#pandas~=2.2.1
-#keras~=3.7.0
-#psycopg2-binary~=2.9.9
-#torch~=2.2.2
-#tensorflow~=2.16.2
-#skorch>=0.15.0
-#torchvision~=0.17.2
-#kaggle~=1.7.4.5
-#starlette~=0.46.1
-#scipy~=1.13.1
-#matplotlib~=3.9.4
+#numpy~=2.5.3
+#scikit-learn~=1.9.1
+#pandas~=3.0.6
+#keras~=3.15.1
+#psycopg2-binary~=2.9.13
+torch~=2.14.1
+Pillow~=12.3.0
+#tensorflow~=2.21.0  # no CPython 3.14 wheel (newest tag is cp313)
+#skorch>=1.4.0
+#torchvision~=0.29.1
+#kaggle~=2.2.4
+#starlette~=1.7.0
+#scipy~=1.18.1
+#matplotlib~=3.11.2

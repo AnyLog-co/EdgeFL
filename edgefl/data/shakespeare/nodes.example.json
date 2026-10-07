@@ -1,0 +1,18 @@
+{
+  "nodes": [
+    "127.0.0.1:32149",
+    "127.0.0.1:32249",
+    "127.0.0.1:32349"
+  ],
+  "db_name": "shakespeare_fl",
+  "train_table": "shakespeare_train",
+  "test_table": "shakespeare_test",
+  "epoch_start": "2026-10-01T17:00:00Z",
+  "round_duration_seconds": 60,
+  "samples_per_round": 64,
+  "test_samples_per_round": 16,
+  "seq_len": 40,
+  "stride": 20,
+  "test_fraction": 0.2,
+  "num_rounds": 0
+}

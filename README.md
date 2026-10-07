@@ -133,6 +133,8 @@ We currently have two demos:
 - [MNIST handwriting dataset demo](Demo-READMEs/MNIST.md)
 - [Winniio demo on temperature prediction](Demo-READMEs/WINNIIO.md), a telemetry dataset. Thank you to your partners [Winniio homepage](https://www.winniio.io)!
 - [Xray detection bounding box](Demo-READMEs/Chest-Xray-BoundingBox.md)
+- [Shakespeare next-character prediction](Demo-READMEs/Shakespeare.md)
+- [MedMNIST blood-cell classification](Demo-READMEs/MedMNIST.md)
 
 
 ## Resolving common issues

@@ -343,6 +343,7 @@ def start_training(aggregator, initial_params, starting_round, end_round, index)
             "message": "Training completed successfully"
         }
     except Exception as e:
+        logger.error(f"[{index}] Training stopped: {e}")
         if isinstance(e, ValueError):
             raise ValueError(f"[{index}] Invalid data or 'newUpdates' missing in Firestore response: {data}")
         else:

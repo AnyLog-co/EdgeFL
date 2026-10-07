@@ -14,15 +14,126 @@ import json
 from requests import RequestException
 
 
-def insert_policy(el_url, policy):
+def _posted_body(data):
+    if data is None:
+        return '(no body)'
+    if isinstance(data, bytes):
+        text = data.decode('utf-8', errors='replace')
+    else:
+        text = str(data)
+    if len(text) > 2000:
+        return text[:2000] + '...<truncated>'
+    return text
+
+
+def _ok_response(text=''):
+    return type('AnyLogResponse', (), {'status_code': 200, 'text': text})()
+
+
+def _exception_chain(error):
+    seen = set()
+    stack = [error]
+    while stack:
+        current = stack.pop()
+        if current is None or id(current) in seen or not isinstance(current, BaseException):
+            continue
+        seen.add(id(current))
+        yield current
+        stack.append(current.__cause__)
+        stack.append(current.__context__)
+        for arg in current.args:
+            if isinstance(arg, BaseException):
+                stack.append(arg)
+
+
+def _anylog_payload(error):
+    """AnyLog writes {"err_code", "err_text"} as the HTTP body. requests reports that as InvalidChunkLength."""
+    for exc in _exception_chain(error):
+        length = getattr(exc, 'length', None)
+        if isinstance(length, (bytes, bytearray)):
+            try:
+                payload = json.loads(length.decode('utf-8'))
+            except (UnicodeError, json.JSONDecodeError):
+                payload = None
+            if isinstance(payload, dict) and 'err_code' in payload:
+                return payload
+        text = str(exc)
+        start = text.find('{"method"')
+        if start == -1:
+            start = text.find('{\\"method\\"')
+        if start == -1:
+            continue
+        end = text.find('}', start)
+        if end == -1:
+            continue
+        blob = text[start:end + 1].replace('\\"', '"').replace("\\'", "'")
+        try:
+            payload = json.loads(blob)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict) and 'err_code' in payload:
+            return payload
+    return None
+
+
+def _anylog_rejection(el_url, command, data, detail):
+    return RuntimeError(
+        f"AnyLog node {el_url} rejected command `{command}`\n"
+        f"body: {_posted_body(data)}\n"
+        f"error: {detail}"
+    )
+
+
+def _post_anylog(el_url, command, data=None):
+    """POST an AnyLog command. Error replies are not valid chunked HTTP, so read err_code out of that exception."""
     headers = {
         'User-Agent': 'AnyLog/1.23',
+        'AnyLog-Agent': 'AnyLog/1.23',
         'Content-Type': 'text/plain',
-        'command': 'blockchain insert where policy = !my_policy and local = true and blockchain = master'
+        'command': command,
     }
+    try:
+        response = requests.post(el_url, headers=headers, data=data, timeout=30)
+        body = response.text or ''
+    except Exception as error:
+        payload = _anylog_payload(error)
+        # err_code 70: this policy id is already on the ledger.
+        if payload and payload.get('err_code') == 70:
+            return _ok_response(json.dumps(payload))
+        if payload:
+            detail = f"err_code {payload.get('err_code')}: {payload.get('err_text')} (node {payload.get('node')})"
+            if payload.get('local_msg'):
+                detail += f" — {payload['local_msg']}"
+            raise _anylog_rejection(el_url, command, data, detail) from None
+        if 'InvalidChunkLength' in str(error) or 'err_code' in str(error):
+            raise _anylog_rejection(el_url, command, data, str(error)) from None
+        raise
 
-    response = requests.post(el_url, headers=headers, data=policy)
+    if '"err_code": 70' in body or '"err_code":70' in body or 'Duplicate blockchain object id' in body:
+        return response
+    if response.status_code != 200 or 'err_code' in body:
+        raise _anylog_rejection(el_url, command, data, f"({response.status_code}): {body}")
     return response
+
+
+def _rest_policy_body(policy):
+    """REST body is the CLI assignment `<new_policy = {json}>`. A bare `new_policy={json}` is executed as a command."""
+    if isinstance(policy, bytes):
+        text = policy.decode('utf-8')
+    elif isinstance(policy, dict):
+        text = json.dumps(policy)
+    else:
+        text = str(policy).strip()
+    if text.startswith('<') and '>' in text:
+        text = text[1:text.rfind('>')].strip()
+    if '=' in text:
+        text = text.split('=', 1)[1].strip()
+    return f'<new_policy = {text}>'
+
+
+def insert_policy(el_url, policy, master=None):
+    command = 'blockchain insert where policy=!new_policy and local=true and master=!ledger_conn'
+    return _post_anylog(el_url, command, data=_rest_policy_body(policy))
 
 # TODO: fix proper blockchain update command
 # def update_policy(el_url, policy_id, policy):
@@ -38,7 +149,7 @@ def delete_policy(el_url, policy_id):
     headers = {
         'User-Agent': 'AnyLog/1.23',
         'Content-Type': 'text/plain',
-        'command': f'blockchain delete policy where id = {policy_id} and local = true and blockchain = master'
+        'command': f'blockchain delete policy where id = {policy_id} and local = true'
     }
 
     response = requests.post(el_url, headers=headers, data=None)
@@ -265,10 +376,12 @@ def fetch_data_from_db(edgelake_node_url, query, tcp_ip_port):
     """
     headers = {
         'User-Agent': 'AnyLog/1.23',
-        'destination': tcp_ip_port,
         'command': f'{query}',
         'subset': 'false'
     }
+    # `run client (ip:port)` already names the operator. destination would send that command there again.
+    if tcp_ip_port and not str(query).lstrip().lower().startswith('run client'):
+        headers['destination'] = tcp_ip_port
 
     try:
         # Send the GET request
@@ -278,7 +391,7 @@ def fetch_data_from_db(edgelake_node_url, query, tcp_ip_port):
         response.raise_for_status()
 
         # Parse the response JSON
-        return response.json()
+        return response.json(strict=False)
     except requests.exceptions.RequestException as e:
         raise IOError(f"Failed to execute SQL query: {e}")
     except json.JSONDecodeError:

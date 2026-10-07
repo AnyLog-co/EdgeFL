@@ -6,3 +6,9 @@ edgefl/tmp_dir/
 edgefl/logs/
 .idea/
 edgefl/data/chest_xrays_bbox/raw/
+edgefl/data/shakespeare/input.txt
+edgefl/data/shakespeare/publish_state.json
+edgefl/data/medmnist/*.npz
+edgefl/data/medmnist/*.part
+edgefl/data/medmnist/publish_state.json
+edgefl/data/medmnist/published_images/

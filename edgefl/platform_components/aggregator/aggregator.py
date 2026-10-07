@@ -4,8 +4,9 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/
 """
 
+import json
 import os
-from asyncio import sleep
+import time
 
 # import numpy as np
 import pickle
@@ -111,7 +112,7 @@ class Aggregator:
                     success = True
                 else:
                     # sleep(np.random.randint(2, 5))
-                    sleep(3)
+                    time.sleep(3)
 
                     if check_policy_inserted(self.edgelake_node_url, data):
                         success = True
@@ -133,15 +134,15 @@ class Aggregator:
             }
 
     def initialize_training_app_on_index(self, index):
+        training_app_path = os.path.join(self.github_dir, self.module_paths[index])
+        class_name = self.module_names[index]
         try:
-            training_app_path = os.path.join(self.github_dir, self.module_paths[index])
-            TrainingApp_class = load_class_from_file(training_app_path, self.module_names[index])
-            self.training_apps[index] = TrainingApp_class(self.agg_name) # Create an instance at index
-        except Exception as e:
-            return {
-                'status': 'error',
-                'message': str(e)
-            }
+            TrainingApp_class = load_class_from_file(training_app_path, class_name)
+        except Exception as error:
+            message = f"Could not load training class '{class_name}' from '{training_app_path}': {error}"
+            self.logger.error(f"[{index}] {message}")
+            raise RuntimeError(message) from error
+        self.training_apps[index] = TrainingApp_class(self.agg_name) # Create an instance at index
 
 
     # On startup, indexes, modules, and module_paths caches are empty, so refill
@@ -232,7 +233,7 @@ class Aggregator:
                     insert_success = True
                 else:
                     # sleep(np.random.randint(2, 5))
-                    sleep(3)
+                    time.sleep(3)
 
                     if check_policy_inserted(self.edgelake_node_url, data):
                         insert_success = True
@@ -255,46 +256,45 @@ class Aggregator:
 
     # function to call the start round function
     def start_round(self, initParams_link, round_number, index):
-        try:
-            # Format data exactly like the example curl command but with your values
-            # NOTE: ask why are we adding the node num from agg
-            data = f'''<my_policy = {{"{index}" : {{
-                                        "index" : "{index}",
-                                        "policy_type": "RoundStart",
-                                        "node_type": "aggregator",
-                                        "round_number": {round_number},
-                                        "initParams": "{initParams_link}",
-                                        "node_id": "{self.agg_name}",
-                                        "ip_port": "{self.edgelake_tcp_node_ip_port}",
-                                        "rest_ip_port": "{self.edgelake_node_url}"
-                              }} }}>'''
-            success = False
-            while not success:
-                # print("Attempting insert")
-                response = insert_policy(self.edgelake_node_url, data)
-                if response.status_code == 200:
-                    success = True
-                else:
-                    # sleep(np.random.randint(5,15))
-                    sleep(5)
-
-                    if check_policy_inserted(self.edgelake_node_url, data):
-                        success = True
-            if success:
-                return {
-                    'status': 'success',
-                    'message': 'initTraining called successfully'
-                }
-            else:
-                return {
-                    'status': 'error',
-                    'message': f'Request failed with status code: {response.status_code}'
-                }
-        except Exception as e:
-            return {
-                'status': 'error',
-                'message': str(e)
+        policy = {index: {
+            "index": index,
+            "policy_type": "RoundStart",
+            "node_type": "aggregator",
+            "round_number": round_number,
+            "initParams": initParams_link,
+            "node_id": self.agg_name,
+            "ip_port": self.edgelake_tcp_node_ip_port,
+            "rest_ip_port": self.edgelake_node_url
             }
+        }
+        data = f"my_policy = {json.dumps(policy)}"
+        insert_policy(self.edgelake_node_url, data)
+
+        where = f"where round_number = {round_number} and node_type = aggregator"
+        policies = []
+        for _ in range(5):
+            try:
+                policies = get_policies(self.edgelake_node_url, index, where)
+            except Exception as error:
+                self.logger.error(f"[{index}] Could not read RoundStart policy: {error}")
+                policies = []
+            if policies:
+                break
+            time.sleep(1)
+
+        if not policies:
+            raise RuntimeError(
+                f"[{index}] RoundStart policy for round {round_number} is not on {self.edgelake_node_url}. "
+                f"The aggregator's EdgeLake node must have ledger_conn set to the master TCP address."
+            )
+
+        self.logger.info(
+            f"[{index}] Published RoundStart policy for round {round_number} on {self.edgelake_node_url}"
+        )
+        return {
+            'status': 'success',
+            'message': 'initTraining called successfully'
+        }
 
     def fetch_decoded_params(self, decoded_params_dict, node_param_download_links, ip_ports, rest_ip_ports, index):
         # use the node_param_download_links to get all the file
@@ -329,7 +329,7 @@ class Aggregator:
                     )
 
                 # Decode the model weights from the file
-                sleep(1)
+                time.sleep(1)
                 with open(local_path, 'rb') as f:
                     data = pickle.load(f)
                 if not data:

@@ -1,0 +1,52 @@
+{
+  "dataset": "bloodmnist",
+  "source_split": "test",
+  "image_size": 28,
+  "display_scale": 8,
+  "display_size": 224,
+  "note": "The file name is the correct prediction. Upload the PNG in the GUI.",
+  "images": [
+    {
+      "file": "0_basophil.png",
+      "label": 0,
+      "class_name": "basophil",
+      "file_stem": "0_basophil",
+      "test_index": 1
+    },
+    {
+      "file": "1_eosinophil.png",
+      "label": 1,
+      "class_name": "eosinophil",
+      "file_stem": "1_eosinophil",
+      "test_index": 2
+    },
+    {
+      "file": "2_erythroblast.png",
+      "label": 2,
+      "class_name": "erythroblast",
+      "file_stem": "2_erythroblast",
+      "test_index": 14
+    },
+    {
+      "file": "4_lymphocyte.png",
+      "label": 4,
+      "class_name": "lymphocyte",
+      "file_stem": "4_lymphocyte",
+      "test_index": 15
+    },
+    {
+      "file": "6_neutrophil.png",
+      "label": 6,
+      "class_name": "neutrophil",
+      "file_stem": "6_neutrophil",
+      "test_index": 8
+    },
+    {
+      "file": "7_platelet.png",
+      "label": 7,
+      "class_name": "platelet",
+      "file_stem": "7_platelet",
+      "test_index": 26
+    }
+  ]
+}

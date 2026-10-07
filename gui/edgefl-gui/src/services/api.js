@@ -29,7 +29,9 @@ const apiCall = async (url, options = {}) => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || `HTTP error! status: ${response.status}`);
+      const detail = data.detail || data.message;
+      const text = typeof detail === 'string' ? detail : JSON.stringify(detail);
+      throw new Error(text || `HTTP error! status: ${response.status}`);
     }
 
     return data;
@@ -181,4 +183,35 @@ export const generateSampleArray = () => {
   return Array.from({ length: 28 }, () => 
     Array.from({ length: 28 }, () => Math.random())
   );
+};
+
+/**
+ * BloodMNIST model resolution. Must match IMAGE_SIZE in medmnist_common.py.
+ * The training node averages an uploaded photo down to this size.
+ */
+export const MEDMNIST_IMAGE_SIZE = 28;
+
+/**
+ * Tiny Shakespeare vocabulary. Must match CHARSET in shakespeare_common.py.
+ */
+export const SHAKESPEARE_CHARSET =
+  "\n !$&',-.3:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+export const SHAKESPEARE_SAMPLE = "To be, or not to be, that is the question";
+
+/**
+ * Encode a prompt as vocabulary indexes for the training node's /infer endpoint.
+ */
+export const inspectShakespearePrompt = (text) => {
+  const ids = [];
+  const dropped = [];
+  for (const ch of text || '') {
+    const index = SHAKESPEARE_CHARSET.indexOf(ch);
+    if (index === -1) {
+      dropped.push(ch);
+    } else {
+      ids.push(index);
+    }
+  }
+  return { ids, dropped: [...new Set(dropped)] };
 };

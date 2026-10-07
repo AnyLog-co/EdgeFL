@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { MEDMNIST_IMAGE_SIZE } from '../services/api';
 
 const InputDataSelector = ({ inputData, setInputData, onDataChange }) => {
   const [inputType, setInputType] = useState('json');
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [uploadError, setUploadError] = useState(null);
+  const [imageReady, setImageReady] = useState(false);
   
   // Grid state for draw canvas
   const [gridData, setGridData] = useState(() => 
@@ -15,6 +18,8 @@ const InputDataSelector = ({ inputData, setInputData, onDataChange }) => {
     setInputData('');
     setSelectedFile(null);
     setImagePreview(null);
+    setUploadError(null);
+    setImageReady(false);
     // Reset grid when switching away from draw
     if (type !== 'draw') {
       setGridData(Array(28).fill().map(() => Array(28).fill(0)));
@@ -46,6 +51,39 @@ const InputDataSelector = ({ inputData, setInputData, onDataChange }) => {
     if (!file) return;
 
     setSelectedFile(file);
+    setUploadError(null);
+    setImageReady(false);
+
+    // The training node converts this file to a 28x28 matrix. Send the image, not pixels.
+    if (inputType === 'medmnist') {
+      const name = String(file.name || '').toLowerCase();
+      const typed = String(file.type || '');
+      const looksLikeImage = typed.startsWith('image/')
+        || name.endsWith('.png')
+        || name.endsWith('.jpg')
+        || name.endsWith('.jpeg');
+      if (!looksLikeImage) {
+        setUploadError('Upload a PNG or JPG image.');
+        setInputData('');
+        if (onDataChange) onDataChange('', 'medmnist');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target.result;
+        setImagePreview(dataUrl);
+        setImageReady(true);
+        setInputData(dataUrl);
+        if (onDataChange) onDataChange(dataUrl, 'medmnist');
+      };
+      reader.onerror = () => {
+        setUploadError('Could not read that image.');
+        setInputData('');
+        if (onDataChange) onDataChange('', 'medmnist');
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
 
     // Create image preview for image files
     if (inputType === 'png' || inputType === 'jpg') {
@@ -93,7 +131,9 @@ const InputDataSelector = ({ inputData, setInputData, onDataChange }) => {
           { value: 'jpg', label: 'JPG Image', icon: '🖼️' },
           { value: 'png', label: 'PNG Image', icon: '🖼️' },
           { value: 'wav', label: 'WAV Audio', icon: '🎵' },
-          { value: 'draw', label: 'Draw Canvas', icon: '✏️' }
+          { value: 'draw', label: 'Draw Canvas', icon: '✏️' },
+          { value: 'text', label: 'Text', icon: '📝' },
+          { value: 'medmnist', label: 'MedMNIST', icon: '🔬' }
         ].map(({ value, label, icon }) => (
           <button
             key={value}
@@ -136,7 +176,13 @@ const InputDataSelector = ({ inputData, setInputData, onDataChange }) => {
         <input
           type="file"
           id="fileUpload"
-          accept={inputType === 'png' ? '.png' : inputType === 'jpg' ? '.jpg,.jpeg' : inputType === 'wav' ? '.wav' : '.json'}
+          accept={
+            inputType === 'png' ? '.png' :
+            inputType === 'jpg' ? '.jpg,.jpeg' :
+            inputType === 'medmnist' ? '.png,.jpg,.jpeg' :
+            inputType === 'wav' ? '.wav' :
+            '.json'
+          }
           // accept={
           //   inputType === 'image' ? '.jpg,.jpeg,.png' :
           //   inputType === 'audio' ? '.wav' :
@@ -155,7 +201,7 @@ const InputDataSelector = ({ inputData, setInputData, onDataChange }) => {
             <span className="file-size">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
           </div>
         )}
-        {imagePreview && (inputType === 'png' || inputType === 'jpg') && (
+        {imagePreview && (inputType === 'png' || inputType === 'jpg' || inputType === 'medmnist') && (
           <div className="image-preview-container">
             <h4>Image Preview:</h4>
             <img 
@@ -178,6 +224,36 @@ const InputDataSelector = ({ inputData, setInputData, onDataChange }) => {
         {inputType === 'png' && 'Upload a PNG image file for inference.'}
         {inputType === 'wav' && 'Upload a WAV audio file for inference.'}
         {inputType === 'json' && 'Upload a JSON file containing your data array.'}
+        {inputType === 'medmnist' && `Upload a blood-cell PNG or JPG. The training node converts it to a ${MEDMNIST_IMAGE_SIZE}x${MEDMNIST_IMAGE_SIZE} matrix and returns the class. Files in edgefl/data/medmnist/eval_images are named with the correct class.`}
+      </small>
+      {uploadError && (
+        <small className="upload-error">{uploadError}</small>
+      )}
+      {inputType === 'medmnist' && imageReady && (
+        <small className="prepared-pixels">
+          Image ready. The training node converts it to a {MEDMNIST_IMAGE_SIZE}x{MEDMNIST_IMAGE_SIZE} matrix.
+        </small>
+      )}
+    </div>
+  );
+
+  const renderTextInput = () => (
+    <div className="form-group">
+      <label htmlFor="textPrompt">Prompt:</label>
+      <textarea
+        id="textPrompt"
+        value={typeof inputData === 'string' ? inputData : ''}
+        onChange={(e) => {
+          setInputData(e.target.value);
+          if (onDataChange) onDataChange(e.target.value, 'text');
+        }}
+        placeholder="To be, or not to be, that is the question"
+        rows={5}
+        required
+      />
+      <small>
+        The training node continues this line one character at a time.
+        Characters outside the Shakespeare vocabulary are left out of the request.
       </small>
     </div>
   );
@@ -222,7 +298,8 @@ const InputDataSelector = ({ inputData, setInputData, onDataChange }) => {
       {renderInputTypeSelector()}
       
       {inputType === 'json' && renderJsonInput()}
-      {(inputType === 'png' || inputType === 'jpg' || inputType === 'wav') && renderFileUpload()}
+      {inputType === 'text' && renderTextInput()}
+      {(inputType === 'png' || inputType === 'jpg' || inputType === 'wav' || inputType === 'medmnist') && renderFileUpload()}
       {inputType === 'draw' && renderDrawCanvas()}
     </div>
   );
